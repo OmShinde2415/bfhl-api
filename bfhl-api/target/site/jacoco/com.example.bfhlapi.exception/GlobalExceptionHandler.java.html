@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">bfhl-api</a> &gt; <a href="index.source.html" class="el_package">com.example.bfhlapi.exception</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.example.bfhlapi.exception;
+
+import com.example.bfhlapi.dto.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+<span class="fc" id="L20">@Slf4j</span>
+@ControllerAdvice
+<span class="fc" id="L22">public class GlobalExceptionHandler {</span>
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ErrorResponse&gt; handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+
+<span class="fc" id="L29">        Map&lt;String, String&gt; validationErrors = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (FieldError fieldError : exception.getBindingResult().getFieldErrors()) {</span>
+<span class="fc" id="L31">            validationErrors.put(fieldError.getField(), fieldError.getDefaultMessage());</span>
+<span class="fc" id="L32">        }</span>
+
+<span class="fc" id="L34">        ErrorResponse response = buildErrorResponse(</span>
+                HttpStatus.BAD_REQUEST,
+                &quot;Validation failed&quot;,
+                request,
+                validationErrors);
+
+<span class="fc" id="L40">        log.warn(&quot;Validation failed for request path={}&quot;, request.getRequestURI());</span>
+<span class="fc" id="L41">        return ResponseEntity.badRequest().body(response);</span>
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity&lt;ErrorResponse&gt; handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request) {
+
+<span class="nc" id="L49">        Map&lt;String, String&gt; validationErrors = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L50">        exception.getConstraintViolations().forEach(violation -&gt;</span>
+<span class="nc" id="L51">                validationErrors.put(violation.getPropertyPath().toString(), violation.getMessage()));</span>
+
+<span class="nc" id="L53">        ErrorResponse response = buildErrorResponse(</span>
+                HttpStatus.BAD_REQUEST,
+                &quot;Validation failed&quot;,
+                request,
+                validationErrors);
+
+<span class="nc" id="L59">        log.warn(&quot;Constraint violation for request path={}&quot;, request.getRequestURI());</span>
+<span class="nc" id="L60">        return ResponseEntity.badRequest().body(response);</span>
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity&lt;ErrorResponse&gt; handleMissingRequestHeader(
+            MissingRequestHeaderException exception,
+            HttpServletRequest request) {
+
+<span class="fc" id="L68">        ErrorResponse response = buildErrorResponse(</span>
+                HttpStatus.BAD_REQUEST,
+<span class="fc" id="L70">                exception.getHeaderName() + &quot; header is mandatory&quot;,</span>
+                request,
+                null);
+
+<span class="fc" id="L74">        log.warn(&quot;Missing required header header={} path={}&quot;, exception.getHeaderName(), request.getRequestURI());</span>
+<span class="fc" id="L75">        return ResponseEntity.badRequest().body(response);</span>
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity&lt;ErrorResponse&gt; handleHttpMessageNotReadable(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request) {
+
+<span class="nc" id="L83">        ErrorResponse response = buildErrorResponse(</span>
+                HttpStatus.BAD_REQUEST,
+                &quot;Request body is missing or malformed&quot;,
+                request,
+                null);
+
+<span class="nc" id="L89">        log.warn(&quot;Malformed request body path={}&quot;, request.getRequestURI());</span>
+<span class="nc" id="L90">        return ResponseEntity.badRequest().body(response);</span>
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ErrorResponse&gt; handleUnexpectedException(
+            Exception exception,
+            HttpServletRequest request) {
+
+<span class="nc" id="L98">        ErrorResponse response = buildErrorResponse(</span>
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                &quot;Unexpected server error&quot;,
+                request,
+                null);
+
+<span class="nc" id="L104">        log.error(&quot;Unexpected error path={}&quot;, request.getRequestURI(), exception);</span>
+<span class="nc" id="L105">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);</span>
+    }
+
+    private ErrorResponse buildErrorResponse(
+            HttpStatus status,
+            String message,
+            HttpServletRequest request,
+            Map&lt;String, String&gt; validationErrors) {
+
+<span class="fc" id="L114">        return ErrorResponse.builder()</span>
+<span class="fc" id="L115">                .success(false)</span>
+<span class="fc" id="L116">                .requestId(request.getHeader(&quot;X-Request-Id&quot;))</span>
+<span class="fc" id="L117">                .timestamp(Instant.now())</span>
+<span class="fc" id="L118">                .status(status.value())</span>
+<span class="fc" id="L119">                .error(status.getReasonPhrase())</span>
+<span class="fc" id="L120">                .message(message)</span>
+<span class="fc" id="L121">                .path(request.getRequestURI())</span>
+<span class="fc" id="L122">                .validationErrors(validationErrors)</span>
+<span class="fc" id="L123">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

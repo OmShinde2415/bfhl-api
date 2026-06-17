@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BfhlServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">bfhl-api</a> &gt; <a href="index.source.html" class="el_package">com.example.bfhlapi.service.impl</a> &gt; <span class="el_source">BfhlServiceImpl.java</span></div><h1>BfhlServiceImpl.java</h1><pre class="source lang-java linenums">package com.example.bfhlapi.service.impl;
+
+import com.example.bfhlapi.dto.BfhlRequest;
+import com.example.bfhlapi.dto.BfhlResponse;
+import com.example.bfhlapi.dto.ProcessingSummary;
+import com.example.bfhlapi.service.BfhlService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+<span class="fc" id="L23">@Slf4j</span>
+@Service
+<span class="fc" id="L25">public class BfhlServiceImpl implements BfhlService {</span>
+
+<span class="fc" id="L27">    private static final Pattern NUMBER_PATTERN = Pattern.compile(&quot;[+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))&quot;);</span>
+<span class="fc" id="L28">    private static final Pattern ALPHABET_PATTERN = Pattern.compile(&quot;[A-Za-z]+&quot;);</span>
+<span class="fc" id="L29">    private static final BigInteger TWO = BigInteger.valueOf(2);</span>
+
+    @Override
+    public BfhlResponse process(BfhlRequest request, String requestId) {
+<span class="fc" id="L33">        long startedAt = System.nanoTime();</span>
+<span class="fc" id="L34">        List&lt;String&gt; input = request.getData();</span>
+
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        int totalElementsReceived = input == null ? 0 : input.size();</span>
+<span class="fc" id="L37">        int invalidElementsIgnored = 0;</span>
+<span class="fc" id="L38">        boolean containsDuplicates = false;</span>
+<span class="fc" id="L39">        Set&lt;String&gt; uniqueValues = new LinkedHashSet&lt;&gt;();</span>
+
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (input != null) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (String rawValue : input) {</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">                if (rawValue == null || rawValue.trim().isEmpty()) {</span>
+<span class="fc" id="L44">                    invalidElementsIgnored++;</span>
+<span class="fc" id="L45">                    continue;</span>
+                }
+
+<span class="fc" id="L48">                String value = rawValue.trim();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                if (!uniqueValues.add(value)) {</span>
+<span class="fc" id="L50">                    containsDuplicates = true;</span>
+                }
+<span class="fc" id="L52">            }</span>
+        }
+
+<span class="fc" id="L55">        ProcessingAccumulator accumulator = new ProcessingAccumulator();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (String value : uniqueValues) {</span>
+<span class="fc" id="L57">            processValue(value, accumulator);</span>
+<span class="fc" id="L58">        }</span>
+
+<span class="fc" id="L60">        List&lt;String&gt; sortedNumbers = accumulator.numbers.stream()</span>
+<span class="fc" id="L61">                .sorted(Comparator.comparing(ProcessedNumber::value))</span>
+<span class="fc" id="L62">                .map(ProcessedNumber::displayValue)</span>
+<span class="fc" id="L63">                .toList();</span>
+
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        String sum = accumulator.numbers.isEmpty()</span>
+<span class="fc" id="L66">                ? &quot;&quot;</span>
+<span class="fc" id="L67">                : normalizeNumber(accumulator.sum);</span>
+
+<span class="fc" id="L69">        String largestNumber = accumulator.numbers.stream()</span>
+<span class="fc" id="L70">                .max(Comparator.comparing(ProcessedNumber::value))</span>
+<span class="fc" id="L71">                .map(ProcessedNumber::value)</span>
+<span class="fc" id="L72">                .map(BfhlServiceImpl::normalizeNumber)</span>
+<span class="fc" id="L73">                .orElse(&quot;&quot;);</span>
+
+<span class="fc" id="L75">        String smallestNumber = accumulator.numbers.stream()</span>
+<span class="fc" id="L76">                .min(Comparator.comparing(ProcessedNumber::value))</span>
+<span class="fc" id="L77">                .map(ProcessedNumber::value)</span>
+<span class="fc" id="L78">                .map(BfhlServiceImpl::normalizeNumber)</span>
+<span class="fc" id="L79">                .orElse(&quot;&quot;);</span>
+
+<span class="fc" id="L81">        long processingTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);</span>
+
+<span class="fc" id="L83">        log.atInfo()</span>
+<span class="fc" id="L84">                .addKeyValue(&quot;requestId&quot;, requestId)</span>
+<span class="fc" id="L85">                .addKeyValue(&quot;uniqueElementCount&quot;, uniqueValues.size())</span>
+<span class="fc" id="L86">                .addKeyValue(&quot;numberCount&quot;, accumulator.numbers.size())</span>
+<span class="fc" id="L87">                .addKeyValue(&quot;alphabetCount&quot;, accumulator.alphabetCount)</span>
+<span class="fc" id="L88">                .addKeyValue(&quot;specialCharacterCount&quot;, accumulator.specialCharacters.size())</span>
+<span class="fc" id="L89">                .log(&quot;BFHL request processed&quot;);</span>
+
+<span class="fc" id="L91">        return BfhlResponse.builder()</span>
+<span class="fc" id="L92">                .success(true)</span>
+<span class="fc" id="L93">                .requestId(requestId)</span>
+<span class="fc" id="L94">                .oddNumbers(accumulator.oddNumbers)</span>
+<span class="fc" id="L95">                .evenNumbers(accumulator.evenNumbers)</span>
+<span class="fc" id="L96">                .alphabets(accumulator.alphabets)</span>
+<span class="fc" id="L97">                .specialCharacters(accumulator.specialCharacters)</span>
+<span class="fc" id="L98">                .sum(sum)</span>
+<span class="fc" id="L99">                .largestNumber(largestNumber)</span>
+<span class="fc" id="L100">                .smallestNumber(smallestNumber)</span>
+<span class="fc" id="L101">                .alphabetCount(accumulator.alphabetCount)</span>
+<span class="fc" id="L102">                .numberCount(accumulator.numbers.size())</span>
+<span class="fc" id="L103">                .specialCharacterCount(accumulator.specialCharacters.size())</span>
+<span class="fc" id="L104">                .containsDuplicates(containsDuplicates)</span>
+<span class="fc" id="L105">                .uniqueElementCount(uniqueValues.size())</span>
+<span class="fc" id="L106">                .sortedNumbers(sortedNumbers)</span>
+<span class="fc" id="L107">                .vowelCount(accumulator.vowelCount)</span>
+<span class="fc" id="L108">                .alphabetFrequency(accumulator.alphabetFrequency)</span>
+<span class="fc" id="L109">                .longestAlphabeticValue(accumulator.longestAlphabeticValue)</span>
+<span class="fc" id="L110">                .shortestAlphabeticValue(accumulator.shortestAlphabeticValue)</span>
+<span class="fc" id="L111">                .processingTimeMs(processingTimeMs)</span>
+<span class="fc" id="L112">                .summary(ProcessingSummary.builder()</span>
+<span class="fc" id="L113">                        .totalElementsReceived(totalElementsReceived)</span>
+<span class="fc" id="L114">                        .validElementsProcessed(uniqueValues.size())</span>
+<span class="fc" id="L115">                        .invalidElementsIgnored(invalidElementsIgnored)</span>
+<span class="fc" id="L116">                        .build())</span>
+<span class="fc" id="L117">                .build();</span>
+    }
+
+    private void processValue(String value, ProcessingAccumulator accumulator) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (isFullNumber(value)) {</span>
+<span class="fc" id="L122">            addNumber(value, accumulator);</span>
+<span class="fc" id="L123">            return;</span>
+        }
+
+<span class="fc" id="L126">        boolean[] consumedByNumber = new boolean[value.length()];</span>
+<span class="fc" id="L127">        extractNumbers(value, accumulator, consumedByNumber);</span>
+<span class="fc" id="L128">        extractAlphabets(value, accumulator);</span>
+<span class="fc" id="L129">        extractSpecialCharacters(value, consumedByNumber, accumulator);</span>
+<span class="fc" id="L130">    }</span>
+
+    private boolean isFullNumber(String value) {
+<span class="fc" id="L133">        return NUMBER_PATTERN.matcher(value).matches();</span>
+    }
+
+    private void extractNumbers(String value, ProcessingAccumulator accumulator, boolean[] consumedByNumber) {
+<span class="fc" id="L137">        Matcher matcher = NUMBER_PATTERN.matcher(value);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L139">            String numberToken = matcher.group();</span>
+<span class="fc" id="L140">            addNumber(numberToken, accumulator);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            for (int index = matcher.start(); index &lt; matcher.end(); index++) {</span>
+<span class="fc" id="L142">                consumedByNumber[index] = true;</span>
+            }
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">    }</span>
+
+    private void extractAlphabets(String value, ProcessingAccumulator accumulator) {
+<span class="fc" id="L148">        Matcher matcher = ALPHABET_PATTERN.matcher(value);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L150">            addAlphabeticValue(matcher.group(), accumulator);</span>
+        }
+<span class="fc" id="L152">    }</span>
+
+    private void extractSpecialCharacters(String value, boolean[] consumedByNumber, ProcessingAccumulator accumulator) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc" id="L156">            char current = value.charAt(index);</span>
+<span class="pc bpc" id="L157" title="1 of 6 branches missed.">            if (!Character.isLetterOrDigit(current) &amp;&amp; !Character.isWhitespace(current) &amp;&amp; !consumedByNumber[index]) {</span>
+<span class="fc" id="L158">                accumulator.specialCharacters.add(String.valueOf(current));</span>
+            }
+        }
+<span class="fc" id="L161">    }</span>
+
+    private void addNumber(String numberToken, ProcessingAccumulator accumulator) {
+<span class="fc" id="L164">        BigDecimal parsedNumber = new BigDecimal(numberToken);</span>
+<span class="fc" id="L165">        String displayValue = normalizeNumber(parsedNumber);</span>
+<span class="fc" id="L166">        accumulator.numbers.add(new ProcessedNumber(parsedNumber, displayValue));</span>
+<span class="fc" id="L167">        accumulator.sum = accumulator.sum.add(parsedNumber);</span>
+
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (isWholeNumber(parsedNumber)) {</span>
+<span class="fc" id="L170">            BigInteger integerValue = parsedNumber.toBigIntegerExact();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (integerValue.remainder(TWO).abs().equals(BigInteger.ZERO)) {</span>
+<span class="fc" id="L172">                accumulator.evenNumbers.add(displayValue);</span>
+            } else {
+<span class="fc" id="L174">                accumulator.oddNumbers.add(displayValue);</span>
+            }
+        }
+<span class="fc" id="L177">    }</span>
+
+    private void addAlphabeticValue(String alphabeticValue, ProcessingAccumulator accumulator) {
+<span class="fc" id="L180">        accumulator.alphabets.add(alphabeticValue);</span>
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (accumulator.longestAlphabeticValue.isEmpty()</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                || alphabeticValue.length() &gt; accumulator.longestAlphabeticValue.length()) {</span>
+<span class="fc" id="L184">            accumulator.longestAlphabeticValue = alphabeticValue;</span>
+        }
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (accumulator.shortestAlphabeticValue.isEmpty()</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                || alphabeticValue.length() &lt; accumulator.shortestAlphabeticValue.length()) {</span>
+<span class="fc" id="L189">            accumulator.shortestAlphabeticValue = alphabeticValue;</span>
+        }
+
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (char rawCharacter : alphabeticValue.toCharArray()) {</span>
+<span class="fc" id="L193">            char lowerCharacter = Character.toLowerCase(rawCharacter);</span>
+<span class="fc" id="L194">            String key = String.valueOf(lowerCharacter);</span>
+<span class="fc" id="L195">            accumulator.alphabetFrequency.merge(key, 1, Integer::sum);</span>
+<span class="fc" id="L196">            accumulator.alphabetCount++;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (isVowel(lowerCharacter)) {</span>
+<span class="fc" id="L198">                accumulator.vowelCount++;</span>
+            }
+        }
+<span class="fc" id="L201">    }</span>
+
+    private static boolean isWholeNumber(BigDecimal value) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        return value.stripTrailingZeros().scale() &lt;= 0;</span>
+    }
+
+    private static boolean isVowel(char value) {
+<span class="pc bpc" id="L208" title="3 of 10 branches missed.">        return value == 'a' || value == 'e' || value == 'i' || value == 'o' || value == 'u';</span>
+    }
+
+    private static String normalizeNumber(BigDecimal value) {
+<span class="fc" id="L212">        BigDecimal normalized = value.stripTrailingZeros();</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (normalized.compareTo(BigDecimal.ZERO) == 0) {</span>
+<span class="fc" id="L214">            return &quot;0&quot;;</span>
+        }
+<span class="fc" id="L216">        return normalized.toPlainString();</span>
+    }
+
+<span class="fc" id="L219">    private record ProcessedNumber(BigDecimal value, String displayValue) {</span>
+    }
+
+<span class="fc" id="L222">    private static class ProcessingAccumulator {</span>
+<span class="fc" id="L223">        private final List&lt;ProcessedNumber&gt; numbers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L224">        private final List&lt;String&gt; oddNumbers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L225">        private final List&lt;String&gt; evenNumbers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L226">        private final List&lt;String&gt; alphabets = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L227">        private final List&lt;String&gt; specialCharacters = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L228">        private final Map&lt;String, Integer&gt; alphabetFrequency = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L229">        private BigDecimal sum = BigDecimal.ZERO;</span>
+        private int alphabetCount;
+        private int vowelCount;
+<span class="fc" id="L232">        private String longestAlphabeticValue = &quot;&quot;;</span>
+<span class="fc" id="L233">        private String shortestAlphabeticValue = &quot;&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

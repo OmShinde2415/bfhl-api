@@ -1,0 +1,16 @@
+com\example\bfhlapi\dto\BfhlRequest$BfhlRequestBuilder.class
+com\example\bfhlapi\service\impl\BfhlServiceImpl.class
+com\example\bfhlapi\controller\BfhlController.class
+com\example\bfhlapi\dto\ErrorResponse$ErrorResponseBuilder.class
+com\example\bfhlapi\service\impl\BfhlServiceImpl$ProcessedNumber.class
+com\example\bfhlapi\dto\BfhlRequest.class
+com\example\bfhlapi\dto\ProcessingSummary.class
+com\example\bfhlapi\dto\ErrorResponse.class
+com\example\bfhlapi\dto\ProcessingSummary$ProcessingSummaryBuilder.class
+com\example\bfhlapi\dto\HealthResponse.class
+com\example\bfhlapi\exception\GlobalExceptionHandler.class
+com\example\bfhlapi\dto\BfhlResponse.class
+com\example\bfhlapi\service\impl\BfhlServiceImpl$ProcessingAccumulator.class
+com\example\bfhlapi\service\BfhlService.class
+com\example\bfhlapi\BfhlApiApplication.class
+com\example\bfhlapi\dto\BfhlResponse$BfhlResponseBuilder.class
